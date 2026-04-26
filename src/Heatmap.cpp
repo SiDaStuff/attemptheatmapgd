@@ -2,7 +2,8 @@
 
 #include <algorithm>
 #include <array>
-#include <charconv>
+#include <cerrno>
+#include <cstdlib>
 #include <cmath>
 #include <string_view>
 
@@ -41,6 +42,20 @@ namespace heatmap {
             }();
 
             return verts;
+        }
+
+        bool parseFloat(std::string_view text, float& out) {
+            std::string copy(text);
+            char* end = nullptr;
+            errno = 0;
+
+            auto value = std::strtof(copy.c_str(), &end);
+            if (end != copy.c_str() + copy.size() || errno == ERANGE) {
+                return false;
+            }
+
+            out = value;
+            return true;
         }
 
         std::string levelKey(GJGameLevel* level) {
@@ -179,10 +194,8 @@ namespace heatmap {
                 DeathPoint point;
                 auto xs = item.substr(0, comma);
                 auto ys = item.substr(comma + 1);
-                auto xres = std::from_chars(xs.data(), xs.data() + xs.size(), point.x);
-                auto yres = std::from_chars(ys.data(), ys.data() + ys.size(), point.y);
 
-                if (xres.ec == std::errc() && yres.ec == std::errc()) {
+                if (parseFloat(xs, point.x) && parseFloat(ys, point.y)) {
                     points.push_back(point);
                 }
             }
