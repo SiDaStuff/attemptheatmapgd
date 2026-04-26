@@ -8,7 +8,7 @@
 	},
 	"id": "sidastuff.attempt_heatmap",
 	"name": "Attempt Heatmap",
-	"version": "v1.0.0",
+	"version": "v1.0.1",
 	"developer": "sidastuff",
 	"description": "Shows where attempts usually end in a level.",
 	"tags": ["gameplay", "interface", "utility", "offline"],
