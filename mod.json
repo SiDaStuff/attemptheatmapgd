@@ -1,0 +1,41 @@
+{
+	"geode": "5.0.1",
+	"gd": {
+		"win": "2.2081",
+		"android": "2.2081",
+		"mac": "2.2081",
+		"ios": "2.2081"
+	},
+	"id": "sidastuff.attempt_heatmap",
+	"name": "Attempt Heatmap",
+	"version": "v1.0.0",
+	"developer": "sidastuff",
+	"description": "Shows where attempts usually end in a level.",
+	"tags": ["gameplay", "interface", "utility", "offline"],
+	"dependencies": {
+		"geode.node-ids": ">=v1.23.3"
+	},
+	"settings": {
+		"toggle-heatmap": {
+			"type": "keybind",
+			"name": "Toggle Heatmap",
+			"description": "Shows or hides the in-level death heatmap.",
+			"default": "H",
+			"category": "gameplay"
+		},
+		"save-point": {
+			"type": "keybind",
+			"name": "Save Heat Point",
+			"description": "Adds your current position to the heatmap for this level.",
+			"default": "",
+			"category": "gameplay"
+		},
+		"clear-storage": {
+			"type": "keybind",
+			"name": "Clear Current Heatmap",
+			"description": "Clears saved heatmap points for the current level.",
+			"default": "",
+			"category": "gameplay"
+		}
+	}
+}
