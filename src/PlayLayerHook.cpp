@@ -5,48 +5,14 @@
 using namespace geode::prelude;
 
 class $modify(HeatmapPlayLayer, PlayLayer) {
-    static constexpr auto kMinLiveFrames = 3;
-    static constexpr auto kMinTravelSq = 12.f * 12.f;
-
     struct Fields {
-        CCPoint m_spawnPos = CCPointZero;
-        CCPoint m_lastGoodPos = CCPointZero;
-        int m_liveFrames = 0;
-        bool m_readyToRecord = false;
-        bool m_hasGoodPos = false;
+        float m_startX = 0.f;
+        bool m_movedFromStart = false;
     };
 
-    void resetAttemptTracker() {
-        m_fields->m_liveFrames = 0;
-        m_fields->m_readyToRecord = false;
-        m_fields->m_hasGoodPos = false;
-
-        if (m_player1) {
-            m_fields->m_spawnPos = m_player1->m_position;
-            m_fields->m_lastGoodPos = m_player1->m_position;
-        }
-    }
-
-    void updateAttemptTracker() {
-        if (!m_player1 || m_player1->m_isDead || m_playerDied) {
-            return;
-        }
-
-        auto pos = m_player1->m_position;
-        auto dx = pos.x - m_fields->m_spawnPos.x;
-        auto dy = pos.y - m_fields->m_spawnPos.y;
-        auto travelSq = (dx * dx) + (dy * dy);
-
-        m_fields->m_liveFrames += 1;
-
-        if (m_fields->m_liveFrames >= kMinLiveFrames && travelSq > kMinTravelSq) {
-            m_fields->m_readyToRecord = true;
-        }
-
-        if (m_fields->m_readyToRecord) {
-            m_fields->m_lastGoodPos = pos;
-            m_fields->m_hasGoodPos = true;
-        }
+    void resetHeatmapAttempt() {
+        m_fields->m_startX = m_player1 ? m_player1->getPositionX() : 0.f;
+        m_fields->m_movedFromStart = false;
     }
 
     bool init(GJGameLevel* level, bool useReplay, bool dontCreateObjects) {
@@ -54,8 +20,13 @@ class $modify(HeatmapPlayLayer, PlayLayer) {
             return false;
         }
 
-        this->resetAttemptTracker();
+        this->resetHeatmapAttempt();
 
+        /*
+            The overlay is attached to the object layer so it scrolls with the
+            level. A high z value keeps it above level objects without needing a
+            separate camera or screen-space conversion.
+        */
         if (m_objectLayer) {
             if (auto overlay = heatmap::Overlay::create(level)) {
                 m_objectLayer->addChild(overlay, 9999);
@@ -66,25 +37,35 @@ class $modify(HeatmapPlayLayer, PlayLayer) {
     }
 
     void postUpdate(float dt) {
-        this->updateAttemptTracker();
         PlayLayer::postUpdate(dt);
+
+        /*
+            Geometry Dash can call death/reset code while the player is still at
+            the level spawn. Waiting until the player has moved right keeps those
+            reset deaths from being saved as a heat spot at the beginning.
+        */
+        if (m_player1 && m_player1->getPositionX() > m_fields->m_startX + 20.f) {
+            m_fields->m_movedFromStart = true;
+        }
     }
 
     void destroyPlayer(PlayerObject* player, GameObject* object) {
-        this->updateAttemptTracker();
-
-        if (m_fields->m_readyToRecord && m_fields->m_hasGoodPos) {
-            heatmap::addDeath(m_level, m_fields->m_lastGoodPos);
+        /*
+            The death position is saved before calling the original function
+            because the original death code can change player state. m_playerDied
+            prevents dual mode from recording the same attempt twice.
+        */
+        if (player && !m_playerDied && m_fields->m_movedFromStart) {
+            heatmap::addDeath(m_level, player->getPosition());
         }
 
         PlayLayer::destroyPlayer(player, object);
-        this->resetAttemptTracker();
         heatmap::refresh();
     }
 
     void resetLevel() {
         PlayLayer::resetLevel();
-        this->resetAttemptTracker();
+        this->resetHeatmapAttempt();
         heatmap::refresh();
     }
 };

@@ -7,3 +7,4 @@ Deaths are saved per level and drawn over the play layer as a heatmap. Warmer sp
 Default keybind: `H`
 
 
+This mod was not solely created with AI.

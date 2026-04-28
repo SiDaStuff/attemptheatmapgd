@@ -17,6 +17,8 @@ class $modify(HeatmapPauseLayer, PauseLayer) {
         PauseLayer::customSetup();
 
         auto winSize = CCDirector::sharedDirector()->getWinSize();
+
+        
         auto sprite = ButtonSprite::create(this->toggleText(), 110, true, "bigFont.fnt", "GJ_button_01.png", 28.f, .55f);
         auto button = CCMenuItemSpriteExtra::create(
             sprite,
