@@ -18,7 +18,6 @@ class $modify(HeatmapPauseLayer, PauseLayer) {
 
         auto winSize = CCDirector::sharedDirector()->getWinSize();
 
-        
         auto sprite = ButtonSprite::create(this->toggleText(), 110, true, "bigFont.fnt", "GJ_button_01.png", 28.f, .55f);
         auto button = CCMenuItemSpriteExtra::create(
             sprite,
@@ -28,10 +27,17 @@ class $modify(HeatmapPauseLayer, PauseLayer) {
 
         auto menu = CCMenu::create();
         menu->setID("attempt-heatmap-menu"_spr);
+
+        /*
+            This sits in the lower-right pause corner, outside the normal center
+            controls. Anchoring from winSize keeps it stable across aspect ratios.
+        */
         menu->setPosition({ winSize.width - 78.f, 31.f });
         menu->addChild(button);
         this->addChild(menu, 20);
 
+        // Keep the ButtonSprite pointer so only the label has to change after a
+        // toggle. Rebuilding the pause menu for one word would be overkill.
         m_fields->m_toggleSprite = sprite;
     }
 

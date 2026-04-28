@@ -7,6 +7,8 @@
 namespace heatmap {
     static constexpr char const* enabledSaveKey = "heatmap-enabled";
     static constexpr char const* overlayNodeID = "attempt-heatmap-overlay";
+    // 600 is enough for messy practice runs, but still small enough that the
+    // saved string stays reasonable. I do not need every death from forever ago.
     static constexpr int maxSavedDeaths = 600;
 
     /*
@@ -19,11 +21,15 @@ namespace heatmap {
             return "level/unknown/deaths";
         }
 
+        // m_levelID is wrapped by Geode, so value() gets the actual number out.
         auto id = static_cast<int>(level->m_levelID.value());
         if (id > 0) {
             return fmt::format("level/{}/deaths", id);
         }
 
+        // Local levels do not always have a real uploaded ID yet. The name is not
+        // perfect if two local levels share it, but it is better than mixing all
+        // local attempts into one giant heatmap.
         return fmt::format("local/{}/deaths", level->m_levelName);
     }
 
@@ -43,6 +49,11 @@ namespace heatmap {
             DeathPoint point {};
             char comma = 0;
 
+            /*
+                Reading the comma into a char is a cheap validity check. Old or
+                hand-edited saves with a bad token are ignored instead of breaking
+                the whole overlay.
+            */
             if (pair >> point.x >> comma >> point.y && comma == ',') {
                 points.push_back(point);
             }
@@ -76,15 +87,20 @@ namespace heatmap {
             return nullptr;
         }
 
+        // getChildByID gives back a normal CCNode, so typeinfo_cast keeps this
+        // from pretending some random node is my overlay if the ID ever collides.
         return typeinfo_cast<Overlay*>(playLayer->m_objectLayer->getChildByID(overlayNodeID));
     }
 
     static void fillCircle(CCDrawNode* node, CCPoint const& center, float radius, ccColor4F const& color) {
         /*
-            CCDrawNode draws polygons, not real circles. 28 points is enough to
-            look round at this size while staying cheap when many deaths exist. Yes, I did use AI to find these values.
+            CCDrawNode only gives us polygons, so the circle is approximated from
+            points around one full turn. 28 segments stays smooth at these radii
+            without making every recorded death expensive to redraw.
         */
         constexpr int circleSegments = 28;
+        // This is 2 * pi. Using a constant avoids pulling in a platform-specific
+        // M_PI define, which is surprisingly annoying in C++ projects.
         constexpr float fullTurn = 6.2831853f;
         CCPoint verts[circleSegments];
 
@@ -98,12 +114,15 @@ namespace heatmap {
     }
 
     static void drawDeath(CCDrawNode* node, DeathPoint const& death) {
+        // Deaths are saved in level/object-layer coordinates, which is why this
+        // can draw at the raw x/y without converting through the camera.
         auto pos = CCPoint { death.x, death.y };
 
         /*
             The overlay uses additive blending, so these low-alpha circles get
-            brighter when several deaths overlap. That creates the heatmap effect
-            without a separate density algorithm. Yes, I did use AI to find these values.
+            brighter when several deaths overlap. Drawing a wide faint circle
+            under a small hot core gives readable clusters without running a
+            separate density pass every frame.
         */
         fillCircle(node, pos, 26.f, { 1.f, .55f, .03f, .10f });
         fillCircle(node, pos, 8.f, { 1.f, .1f, .02f, .25f });
@@ -138,10 +157,6 @@ namespace heatmap {
     }
 
     Overlay* Overlay::create(GJGameLevel* level) {
-        /*
-            Cocos2d objects use create/init/autorelease instead of plain stack
-            objects. This matches how Geode expects CCNode subclasses to be made.
-        */
         auto ret = new Overlay();
         if (ret && ret->init(level)) {
             ret->autorelease();
@@ -159,12 +174,22 @@ namespace heatmap {
 
         m_level = level;
         this->setID(overlayNodeID);
+
+        // The PlayLayer owns the GJGameLevel while this overlay exists, so this
+        // can just keep the pointer instead of copying level data everywhere.
+        /*
+            GL_ONE makes new pixels add to what is already on screen. That is the
+            whole heatmap trick: overlapping deaths naturally become more intense
+            while isolated deaths stay subtle.
+        */
         this->setBlendFunc({ GL_SRC_ALPHA, GL_ONE });
         this->redraw();
         return true;
     }
 
     void Overlay::redraw() {
+        // Clear first so toggling/settings changes do not leave old circles stuck
+        // on the draw node.
         this->clear();
 
         if (!isEnabled()) {

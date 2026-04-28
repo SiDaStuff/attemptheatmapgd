@@ -6,11 +6,15 @@ using namespace geode::prelude;
 
 class $modify(HeatmapPlayLayer, PlayLayer) {
     struct Fields {
+        // Geode gives each PlayLayer its own Fields object. These are attempt
+        // state, so they should reset with the level instead of being global.
         float m_startX = 0.f;
         bool m_movedFromStart = false;
     };
 
     void resetHeatmapAttempt() {
+        // Practice mode can restart from checkpoints, so the "start" is whatever
+        // x position the player has when the attempt begins.
         m_fields->m_startX = m_player1 ? m_player1->getPositionX() : 0.f;
         m_fields->m_movedFromStart = false;
     }
@@ -42,7 +46,9 @@ class $modify(HeatmapPlayLayer, PlayLayer) {
         /*
             Geometry Dash can call death/reset code while the player is still at
             the level spawn. Waiting until the player has moved right keeps those
-            reset deaths from being saved as a heat spot at the beginning.
+            reset deaths from being saved as a heat spot at the beginning. The
+            20px buffer is intentionally tiny: enough to skip spawn cleanup, but
+            not enough to hide real first-jump deaths.
         */
         if (m_player1 && m_player1->getPositionX() > m_fields->m_startX + 20.f) {
             m_fields->m_movedFromStart = true;
@@ -53,13 +59,16 @@ class $modify(HeatmapPlayLayer, PlayLayer) {
         /*
             The death position is saved before calling the original function
             because the original death code can change player state. m_playerDied
-            prevents dual mode from recording the same attempt twice.
+            prevents dual mode from recording the same attempt twice when both
+            player objects are destroyed during the same crash.
         */
         if (player && !m_playerDied && m_fields->m_movedFromStart) {
             heatmap::addDeath(m_level, player->getPosition());
         }
 
         PlayLayer::destroyPlayer(player, object);
+        // Redraw after the original death handling so the overlay is still synced
+        // if Geometry Dash resets or moves nodes during destroyPlayer.
         heatmap::refresh();
     }
 
